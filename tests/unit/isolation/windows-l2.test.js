@@ -63,7 +63,7 @@ test('windows-l2: authorization validation enforces scope, profile, expiry and r
   assert.equal(validateWindowsL2Authorization({}).ok, false)
 })
 
-test('windows-l2: read-only inspect compiles the native backend without mutation', async (t) => {
+test('windows-l2: read-only inspect compiles the native backend without mutation', { skip: process.platform !== 'win32' }, async (t) => {
   const inspection = await inspectWindowsL2Backend()
   if (!inspection.ran && inspection.errors.some((message) => /ENOENT|pwsh/i.test(message))) {
     t.skip('pwsh is not available in this environment')
@@ -85,7 +85,7 @@ test('windows-l2: read-only inspect compiles the native backend without mutation
   assert.equal(inspection.probe.native_backend, 'windows-l2-appcontainer-jobobject/v1')
 })
 
-test('windows-l2: readiness is prepared but never market-available', async (t) => {
+test('windows-l2: readiness is prepared but never market-available', { skip: process.platform !== 'win32' }, async (t) => {
   const inspection = await inspectWindowsL2Backend()
   if (!inspection.ran) {
     t.skip('pwsh is not available in this environment')

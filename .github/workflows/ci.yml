@@ -1,8 +1,9 @@
 name: CI
 
-# 生效条件：push 到任意分支、或对 main 发起 PR 时触发。
-# 判据分三层：typecheck 与 unit 是硬门禁；integration 是 advisory（本仓 evidence/anchor
-# 绑定作者主机快照，见 README「运行时锚定」与 tests/integration/cordis-contract/README.md）。
+# 触发：push 到任意分支、或对 main 发起 PR。
+# 判据：typecheck 与 unit 是硬门禁；integration / security 是 advisory
+# （evidence/anchor 与 host facts 绑定作者主机快照，见 README「运行时锚定」）。
+# Node 20 不在矩阵内：packageManager 锁定的 pnpm 11.28.5 要求 Node >= 22.13。
 on:
   push:
     branches: ['**']
@@ -12,15 +13,20 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   typecheck:
     name: typecheck (${{ matrix.os }} / node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: ['20', '22', '24']
+        node: ['22', '24']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,11 +42,12 @@ jobs:
   unit:
     name: unit tests (${{ matrix.os }} / node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: ['20', '22', '24']
+        node: ['22', '24']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,6 +63,7 @@ jobs:
   integration-advisory:
     name: integration (advisory)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -70,3 +78,20 @@ jobs:
         run: pnpm --dir cordis-runtime install --frozen-lockfile
       - name: integration suite (expected to report host-bound failures, see README)
         run: node --test "tests/integration/**/*.test.js"
+
+  security-advisory:
+    name: security (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: enable corepack (pnpm from packageManager)
+        run: corepack enable
+      - name: install
+        run: pnpm install --frozen-lockfile
+      - name: security suite (host-bound assertions report as advisory)
+        run: node --test "tests/security/**/*.test.js"
